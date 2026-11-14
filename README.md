@@ -388,6 +388,8 @@ ollama pull deepseek-r1:14b     # optional: stronger reasoning, slower
 ```
 Make sure Ollama is running (`ollama serve`, or the tray app).
 
+**Connecting Ollama to Local Chat needs no setup.** Open any new terminal and run `ollama list`. If your installed models are listed, Ollama is up and Local Chat can use it. Local Chat scans Ollama automatically, shows every installed model in the model picker, and lets you choose one. You don't have to configure or start each model yourself, and any model you pull later appears in the picker too.
+
 ### 3. Install the app
 ```
 cd local-chat
