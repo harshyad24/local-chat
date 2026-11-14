@@ -434,7 +434,6 @@ node --test tests/
 |---|---|
 | **Laptop (main development machine)** | MSI GF65 · NVIDIA RTX 2060 **6 GB** · 16 GB RAM · Windows 11 · Python 3.12 |
 | **Models used here** | `qwen3.5:9b` (main model for every live test, ~6.5 GB, Q4_K_M) · `deepseek-r1:14b` (loaded for reasoning-model work) |
-| **Desktop (owner's second machine)** | run with `deepseek-r1:32b`; used for hands-on observations, not for the automated measurements below |
 | **Embeddings** | `paraphrase-multilingual-MiniLM-L12-v2` (CUDA when VRAM is free, else CPU) |
 
 ### Automated tests
