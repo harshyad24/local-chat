@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Local Chat</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23c15f3c'/%3E%3Cpath d='M9 11h14M9 16h14M9 21h8' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>
+  // Apply cached theme/font before first paint to avoid a flash.
+  (function () {
+    try {
+      var t = localStorage.getItem('theme') || 'system';
+      var dark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      var f = localStorage.getItem('font_size');
+      if (f) document.documentElement.style.setProperty('--fs', f + 'px');
+      if (localStorage.getItem('sb') === 'collapsed') document.documentElement.classList.add('pre-collapsed');
+    } catch (e) {}
+  })();
+</script>
+<link rel="stylesheet" href="vendor/katex.min.css">
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="stylesheet" href="css/style.css">
+<script defer src="vendor/marked.min.js"></script>
+<script defer src="vendor/purify.min.js"></script>
+<script defer src="vendor/highlight.min.js"></script>
+<script defer src="vendor/katex.min.js"></script>
+<script defer src="vendor/mermaid.min.js"></script>
+<script defer src="vendor/chart.umd.min.js"></script>
+<script defer src="vendor/cytoscape.min.js"></script>
+<script defer src="vendor/leaflet.js"></script>
+<script defer src="js/mapview.js"></script>
+<script defer src="js/skills.js"></script>
+<script defer src="js/learnlab.js"></script>
+<script defer src="js/learnhub.js"></script>
+<script defer src="js/viz-schema.js"></script>
+<script defer src="js/exporter.js"></script>
+<script defer src="js/viz.js"></script>
+<script defer src="js/entity.js"></script>
+<script defer src="js/api.js"></script>
+<script defer src="js/render.js"></script>
+<script defer src="js/app.js"></script>
+<script defer src="js/library.js"></script>
+<script defer src="js/pluginsui.js"></script>
+<script defer src="js/connections.js"></script>
+<script defer src="js/panel.js"></script>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============================ Sidebar ============================ -->
+  <aside id="sidebar" aria-label="Chat history">
+    <div class="sb-top">
+      <button id="btn-sidebar-close" class="icon-btn" title="Close sidebar (Ctrl+Shift+S)" aria-label="Close sidebar"></button>
+      <button id="btn-new" class="new-chat"><span class="ic"></span> New chat</button>
+    </div>
+    <div class="sb-search">
+      <span class="ic"></span>
+      <input id="search" type="search" placeholder="Search chats" autocomplete="off" aria-label="Search chats">
+    </div>
+    <nav id="chat-list" aria-label="Chats"></nav>
+    <div class="sb-bottom">
+      <button id="btn-library" class="sb-link"><span class="ic"></span> Library <span class="sb-sub">memory · assistants · projects</span></button>
+      <button id="btn-learn" class="sb-link"><span class="ic"></span> Learning <span class="sb-sub">courses · flashcards · quizzes</span></button>
+      <button id="btn-archived" class="sb-link"><span class="ic"></span> Archived chats</button>
+      <button id="btn-settings" class="sb-link"><span class="avatar" id="avatar">U</span><span id="sb-user">Settings</span></button>
+    </div>
+  </aside>
+  <div id="scrim"></div>
+
+  <!-- ============================== Main ============================== -->
+  <main id="main" class="empty">
+    <header id="topbar">
+      <button id="btn-sidebar-open" class="icon-btn" title="Open sidebar (Ctrl+Shift+S)" aria-label="Open sidebar"></button>
+      <div class="model-picker">
+        <button id="model-btn" aria-haspopup="listbox"><span id="model-label">Loading models…</span><span class="ic chev"></span></button>
+        <div id="model-menu" class="popover hidden" role="listbox"></div>
+      </div>
+      <button id="ctx-chip" class="ctx-chip hidden" title="Assistant / project for this chat"></button>
+      <div class="spacer"></div>
+      <button id="btn-panel" class="icon-btn" title="Side panel" aria-label="Side panel"></button>
+      <button id="btn-palette" class="icon-btn" title="Command palette (Ctrl+K)" aria-label="Command palette"></button>
+    </header>
+
+    <div id="banner" class="banner hidden" role="alert"></div>
+    <div id="drop-overlay" class="hidden"><div>Drop files to attach</div></div>
+
+    <!-- Welcome / empty state: composer is moved in here by JS -->
+    <section id="welcome">
+      <div class="welcome-inner">
+        <h1 id="greeting">How can I help you today?</h1>
+        <div id="welcome-slot"></div>
+        <div id="cards" class="cards"></div>
+      </div>
+    </section>
+
+    <!-- Conversation -->
+    <section id="scroller">
+      <div id="thread" class="column"></div>
+    </section>
+
+    <div id="dock">
+      <button id="scroll-bottom" class="hidden" title="Scroll to bottom" aria-label="Scroll to bottom"></button>
+      <div id="dock-slot" class="column"></div>
+    </div>
+
+    <!-- The composer lives here and is moved between the welcome slot and the dock -->
+    <div id="composer-wrap">
+      <div id="composer" class="composer">
+        <div id="attach-row" class="attach-row hidden" aria-label="Attachments"></div>
+        <textarea id="input" rows="1" placeholder="Message your local model…" aria-label="Message"></textarea>
+        <div class="composer-row">
+          <div class="chips">
+            <button id="btn-plus" class="chip-plus" type="button" title="Attach files, web search, thinking" aria-label="Attach files and options"></button>
+            <button id="btn-mic" class="chip-plus" type="button" title="Dictate (offline speech-to-text)" aria-label="Dictate" aria-pressed="false"></button>
+          </div>
+          <span id="counter" class="counter"></span>
+          <button id="send" class="send-btn" title="Send" aria-label="Send"></button>
+        </div>
+      </div>
+      <p class="disclaimer">Runs locally on your machine. Models can make mistakes.</p>
+    </div>
+  </main>
+
+  <!-- ===================== Side panel (artifacts) ===================== -->
+  <aside id="panel" class="hidden" aria-label="Side panel">
+    <div class="panel-head">
+      <select id="panel-pick" aria-label="Artifact"></select>
+      <div class="panel-tabs" role="tablist">
+        <button data-ptab="preview" class="active">Preview</button>
+        <button data-ptab="code">Code</button>
+      </div>
+      <div class="spacer"></div>
+      <button class="icon-btn" id="panel-copy" title="Copy" aria-label="Copy"></button>
+      <button class="icon-btn" id="panel-download" title="Download" aria-label="Download"></button>
+      <button class="icon-btn" id="panel-close" title="Close" aria-label="Close panel"></button>
+    </div>
+    <div id="panel-body"></div>
+  </aside>
+</div>
+
+<div id="ctx-menu" class="popover hidden" role="menu"></div>
+<div id="plus-menu" class="popover hidden" role="menu"></div>
+<input type="file" id="file-input" multiple hidden>
+<div id="toasts"></div>
+
+<!-- ============================ Dialogs ============================ -->
+<dialog id="dlg-settings" class="dlg dlg-wide">
+  <div class="dlg-head">
+    <h2>Settings</h2>
+    <button class="icon-btn" data-close aria-label="Close"></button>
+  </div>
+  <div class="settings-layout">
+    <nav id="settings-tabs"></nav>
+    <div id="settings-body"></div>
+  </div>
+</dialog>
+
+<dialog id="dlg-library" class="dlg dlg-wide">
+  <div class="dlg-head">
+    <h2>Library</h2>
+    <button class="icon-btn" data-close aria-label="Close"></button>
+  </div>
+  <div class="settings-layout">
+    <nav id="lib-tabs"></nav>
+    <div id="lib-body"></div>
+  </div>
+</dialog>
+<dialog id="dlg-learn" class="dlg dlg-wide">
+  <div class="dlg-head">
+    <h2>Learning</h2>
+    <button class="icon-btn" data-close aria-label="Close"></button>
+  </div>
+  <div class="settings-layout">
+    <nav id="lh-tabs"></nav>
+    <div id="lh-body"></div>
+  </div>
+</dialog>
+<input type="file" id="import-input" accept=".json,application/json" hidden>
+
+<dialog id="dlg-shortcuts" class="dlg">
+  <div class="dlg-head">
+    <h2>Keyboard shortcuts</h2>
+    <button class="icon-btn" data-close aria-label="Close"></button>
+  </div>
+  <table class="kbd-table">
+    <tr><td>New chat</td><td><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>O</kbd></td></tr>
+    <tr><td>Toggle sidebar</td><td><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>S</kbd></td></tr>
+    <tr><td>Focus message box</td><td><kbd>Shift</kbd> <kbd>Esc</kbd></td></tr>
+    <tr><td>Copy last response</td><td><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>C</kbd></td></tr>
+    <tr><td>Command palette</td><td><kbd>Ctrl</kbd> <kbd>K</kbd></td></tr>
+    <tr><td>Show this help</td><td><kbd>Ctrl</kbd> <kbd>/</kbd></td></tr>
+    <tr><td>Send message</td><td><kbd>Enter</kbd></td></tr>
+    <tr><td>New line</td><td><kbd>Shift</kbd> <kbd>Enter</kbd></td></tr>
+  </table>
+  <p class="muted small">On macOS use <kbd>⌘</kbd> instead of <kbd>Ctrl</kbd>. If your browser reserves a shortcut, run the action from the command palette.</p>
+</dialog>
+
+<dialog id="dlg-palette" class="dlg dlg-palette">
+  <input id="pal-input" type="text" placeholder="Search chats or run a command…" autocomplete="off" aria-label="Command palette">
+  <div id="pal-list" role="listbox"></div>
+</dialog>
+
+<dialog id="dlg-confirm" class="dlg dlg-small">
+  <h2 id="confirm-title">Are you sure?</h2>
+  <p id="confirm-msg" class="muted"></p>
+  <div class="dlg-actions">
+    <button class="btn" id="confirm-cancel">Cancel</button>
+    <button class="btn danger" id="confirm-ok">Delete</button>
+  </div>
+</dialog>
+
+</body>
+</html>
